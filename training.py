@@ -44,6 +44,16 @@ class ExpDecayLRWithWarmup(LambdaLR):
         super(ExpDecayLRWithWarmup, self).__init__(optimizer, lr_lambda, last_epoch)
 
 
+class GradientAccumulator(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
 
 if __name__ == "__main__":
     t = torch.Tensor([5,6])
