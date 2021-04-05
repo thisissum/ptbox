@@ -1,6 +1,9 @@
 import math
 import numpy as np
 import torch
+from torch import nn
+from torch.functional import Tensor
+from torch.nn.modules.loss import CrossEntropyLoss
 from torch.optim.lr_scheduler import LambdaLR
 
 
@@ -17,6 +20,10 @@ class ConstantLRWithWarmup(LambdaLR):
 
     """
     def __init__(self, optimizer, num_warmup_steps, last_epoch=-1):
+
+        optimizer.zero_grad()
+        optimizer.step()
+
         def lr_lambda(cur_step):
             if cur_step < num_warmup_steps:
                 return float(cur_step) / float(max(num_warmup_steps, 1.0))
@@ -36,6 +43,10 @@ class ExpDecayLRWithWarmup(LambdaLR):
         >>> scheduler.step()
     """
     def __init__(self, optimizer, num_warmup_steps, decay_factor=0.9995, last_epoch=-1):
+
+        optimizer.zero_grad()
+        optimizer.step()
+
         def lr_lambda(cur_step):
             if cur_step < num_warmup_steps:
                 return float(cur_step) / float(max(num_warmup_steps, 1.0))
@@ -45,22 +56,66 @@ class ExpDecayLRWithWarmup(LambdaLR):
 
 
 class GradientAccumulator(object):
-    def __init__(self):
-        pass
+    def __init__(self, accumulation_steps=1):
+        self.accumulation_steps = accumulation_steps
+        self._cur_step = 0
+
+    def __call__(self, loss, optimizer):
+        self._loss = loss
+        self._optimizer = optimizer
+        return self
 
     def __enter__(self):
+        self._cur_step += 1
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
+        return False
+    
+    def backward(self):
+        self._loss = self._loss / self.accumulation_steps
+        self._loss.backward()
+    
+    def step(self):
+        if self.cur_step % self.accumulation_steps == 0:
+            # print("backward")
+            self._optimizer.step()
+            self._optimizer.zero_grad()
+    
+    @property
+    def cur_step(self):
+        return self._cur_step
+    
+
 
 
 if __name__ == "__main__":
-    t = torch.Tensor([5,6])
-    t.requires_grad_()
-    opt = torch.optim.AdamW([t], lr=1e-3)
-    a = ConstantLRWithWarmup(opt, 1000)
-    a.step()
-    print(opt.param_groups[0]["lr"]) # 1e-6
-    a.step()
-    print(opt.param_groups[0]["lr"]) # 1e-6
+    def test_accumulator():
+        from sklearn.datasets import load_iris
+        from sklearn.model_selection import train_test_split
+        from torch.utils.data import TensorDataset, DataLoader
+        data = load_iris()
+        X = data['data']
+        y = data['target']
+        model = torch.nn.Sequential(nn.Linear(4,16), nn.Linear(16,3))
+        opti = torch.optim.Adam(model.parameters(), lr=1e-2)
+        criterion = CrossEntropyLoss()
+        accumulator = GradientAccumulator(accumulation_steps=3)
+        
+        tx, cvx, ty, cvy = train_test_split(X, y, test_size=0.2, random_state=1)
+        train_loader = DataLoader(TensorDataset(torch.FloatTensor(tx), torch.LongTensor(ty)), batch_size=32)
+        dev_loader = DataLoader(TensorDataset(torch.FloatTensor(cvx), torch.LongTensor(cvy)), batch_size=32)
+        for i in range(100):
+            for train_x, train_y in train_loader:
+                output = model(train_x)
+                loss = criterion(output, train_y)
+                with accumulator(loss, opti) as accu:
+                    accu.backward()
+                    accu.step()
+            for dev_x, dev_y in train_loader:
+                output = model(dev_x)
+                true_num = (output.argmax(dim=1) == dev_y).sum()
+            print("Correct num: {}".format(true_num.item()))
+    test_accumulator()
+
+    
