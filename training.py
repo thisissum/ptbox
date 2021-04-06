@@ -9,8 +9,8 @@ from torch.optim.lr_scheduler import LambdaLR
 
 class ConstantLRWithWarmup(LambdaLR):
     """
-    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps
-    If cur_step >= num_warmup_steps, the ratio will be 1.0
+    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps \n
+    If cur_step >= num_warmup_steps, the ratio will be 1.0 \n
     Example:
         >>> scheduler = ConstantLRWithWarmup(optimizer, num_warmup_steps, last_epoch)
         ...
@@ -33,8 +33,8 @@ class ConstantLRWithWarmup(LambdaLR):
 
 class ExpDecayLRWithWarmup(LambdaLR):
     """
-    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps
-    If cur_step >= num_warmup_steps, the optimizer.lr will be multiplied by decay_factor for each step
+    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps \n
+    If cur_step >= num_warmup_steps, the optimizer.lr will be multiplied by decay_factor for each step \n
     Example:
         >>> scheduler = ExpDecayLRWithWarmup(optimizer, num_warmup_steps, decay_factor, last_epoch)
         ...
@@ -56,6 +56,17 @@ class ExpDecayLRWithWarmup(LambdaLR):
 
 
 class GradientAccumulator(object):
+    """
+    Update parameter after accumulate gradient by given accumulation_steps \n
+    Example:
+        >>> accumulator = GradientAccumulator(accumulation_steps=3)
+        >>> optimizer = torch.optim.Adam(model.parameters())
+        ...
+        >>> loss = loss_func(predictions, target)
+        >>> with accumulator(loss, optimizer) as accu:
+                accu.backward()
+                accu.step()
+    """
     def __init__(self, accumulation_steps=1):
         self.accumulation_steps = accumulation_steps
         self._cur_step = 0
