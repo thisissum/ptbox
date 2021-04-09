@@ -88,7 +88,7 @@ class GradientAccumulator(object):
         self._loss.backward()
     
     def step(self):
-        if self.cur_step % self.accumulation_steps == 0:
+        if self._cur_step % self.accumulation_steps == 0:
             # print("backward")
             self._optimizer.step()
             self._optimizer.zero_grad()
