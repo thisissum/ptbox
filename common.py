@@ -15,7 +15,7 @@ def seed_everything(seed=512):
     :return: None
     """
     random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = seed
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
     np.random.seed(seed)
     torch.manual_seed(seed)
