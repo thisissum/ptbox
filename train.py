@@ -9,8 +9,8 @@ from torch.optim.lr_scheduler import LambdaLR
 
 class ConstantLRWithWarmup(LambdaLR):
     """
-    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps \n
-    If cur_step >= num_warmup_steps, the ratio will be 1.0 \n
+    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps  
+    If cur_step >= num_warmup_steps, the ratio will be 1.0  
     Example:
         >>> scheduler = ConstantLRWithWarmup(optimizer, num_warmup_steps, last_epoch)
         ...
@@ -20,21 +20,19 @@ class ConstantLRWithWarmup(LambdaLR):
 
     """
     def __init__(self, optimizer, num_warmup_steps, last_epoch=-1):
-
-        optimizer.zero_grad()
-        optimizer.step()
-
         def lr_lambda(cur_step):
             if cur_step < num_warmup_steps:
                 return float(cur_step) / float(max(num_warmup_steps, 1.0))
             return 1.0
         super(ConstantLRWithWarmup, self).__init__(optimizer, lr_lambda, last_epoch)
+        optimizer.zero_grad()
+        optimizer.step()
 
 
 class ExpDecayLRWithWarmup(LambdaLR):
     """
-    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps \n
-    If cur_step >= num_warmup_steps, the optimizer.lr will be multiplied by decay_factor for each step \n
+    Increase lr to optimizer.lr linearly with ratio cur_step/num_warmup_steps  
+    If cur_step >= num_warmup_steps, the optimizer.lr will be multiplied by decay_factor for each step  
     Example:
         >>> scheduler = ExpDecayLRWithWarmup(optimizer, num_warmup_steps, decay_factor, last_epoch)
         ...
@@ -43,16 +41,14 @@ class ExpDecayLRWithWarmup(LambdaLR):
         >>> scheduler.step()
     """
     def __init__(self, optimizer, num_warmup_steps, decay_factor=0.9995, last_epoch=-1):
-
-        optimizer.zero_grad()
-        optimizer.step()
-
         def lr_lambda(cur_step):
             if cur_step < num_warmup_steps:
                 return float(cur_step) / float(max(num_warmup_steps, 1.0))
             times = min(max(cur_step, 1.0) - num_warmup_steps, 1.0)
             return decay_factor**times
         super(ExpDecayLRWithWarmup, self).__init__(optimizer, lr_lambda, last_epoch)
+        optimizer.zero_grad()
+        optimizer.step()
 
 
 class GradientAccumulator(object):
@@ -67,13 +63,14 @@ class GradientAccumulator(object):
                 accu.backward()
                 accu.step()
     """
-    def __init__(self, accumulation_steps=1):
+    def __init__(self, accumulation_steps: int = 1):
         self.accumulation_steps = accumulation_steps
         self._cur_step = 0
 
-    def __call__(self, loss, optimizer):
+    def __call__(self, loss, optimizer, lr_scheduler=None):
         self._loss = loss
         self._optimizer = optimizer
+        self._lr_scheduler = lr_scheduler
         return self
 
     def __enter__(self):
@@ -89,7 +86,9 @@ class GradientAccumulator(object):
     
     def step(self):
         if self._cur_step % self.accumulation_steps == 0:
-            # print("backward")
+            # change lr before apply gradients to weights
+            if self._lr_scheduler is not None:
+                self._lr_scheduler.step()
             self._optimizer.step()
             self._optimizer.zero_grad()
     
